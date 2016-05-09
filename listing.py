@@ -4,12 +4,10 @@ import urllib
 import json
 
 # res = urllib2.urlopen("http://open.spotify.com/user/spotify/playlist/5yolys8XG4q7YfjYGl5Lff")   #rap caviar
-res = urllib2.urlopen("http://open.spotify.com/user/spotify/playlist/2qTeRwnwFquJUKrAFWnolb")   #viral hits
+# res = urllib2.urlopen("http://open.spotify.com/user/spotify/playlist/2qTeRwnwFquJUKrAFWnolb")   #viral hits
+res = urllib2.urlopen("http://open.spotify.com/user/billboard.com/playlist/6UeSakyzhiEt4NB3UAd6NQ")   #billboard
 html = res.read()
 
-
-
-# with open("spot.html","r") as fp:
 soup = BeautifulSoup(html,"lxml")
 
 sc = soup.find_all("script")
@@ -31,8 +29,6 @@ with open(obj["name"],"w") as fp:
     fp.write("Followers : "+str(obj["followers"]["total"]) +"\n" +"\n")
 
     lst = obj["tracks"]["items"]
-
-    # song=lst[0]
     for song in lst:
         album=song["track"]["album"]["name"]
         artists=""
@@ -40,9 +36,17 @@ with open(obj["name"],"w") as fp:
             artists = artists + artist["name"] + ","
         artists = artists[:-1]
         duration = song["track"]["duration_ms"]
-        duration = duration/(1000*60*1.0)
+        duration = duration/(1000*1.0)
+        duration = int(round(duration))
+        mins = duration/60
+        secs = duration - mins*60
+        if secs < 10:
+            duration = str(mins) + ":0" + str(secs)
+        else:
+            duration = str(mins) + ":" + str(secs)
+
         name = song["track"]["name"]
         image_name = artists + " - " + album + ".jpg"
-        urllib.urlretrieve(song["track"]["album"]["images"][0]["url"],image_name.encode("utf-8"))
+        # urllib.urlretrieve(song["track"]["album"]["images"][0]["url"],image_name.encode("utf-8"))
         out_str = artists + " - " + name + " - " + album + " - " + str(duration)
         fp.write(out_str.encode("utf-8")+"\n")
