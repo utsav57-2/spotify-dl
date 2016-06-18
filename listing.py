@@ -4,9 +4,10 @@ import urllib
 import json
 import sys
 from urllib import quote_plus as qp
+import sel
 
 ALBUM_ART = False
-DEBUG = False
+DEBUG = True
 
 def get_playlist_json(album_url):
     result = urllib2.urlopen(album_url)
@@ -64,9 +65,18 @@ def get_playlist(album_url):
 
     return playlist
 
+def print_playlist(pl):
+    print "\nPLAYLIST:\n"
+    for track in pl:
+        for j in track:
+            print j,": ",track[j]
+        print
+
+    print
+
+
 def get_youtube_links(pl):
     base_url = "https://www.youtube.com/results?search_query="
-    yt_links = []
 
     for i in pl:
         query = '' + qp(i["song_name"])
@@ -80,20 +90,31 @@ def get_youtube_links(pl):
         req_url = base_url + query
 
         if DEBUG:
-            for i in req_url:
-                print i
+            print 'Search Query: ' + req_url
 
         result = urllib2.urlopen(req_url)
         html = result.read()
         soup = BeautifulSoup(html,"lxml")
 
         links = soup.find_all('h3',class_='yt-lockup-title')
-        # TODO
-        links_texts = [i.a.string for i in links]
-        links_arr = [i.a['href'] for i in links]
-        yt_links.append(links_arr[0])
+        # TODO scrape title
+        title_texts = [link.a.string for link in links]
 
-    return yt_links
+        if DEBUG:
+            print "\nLINK TITLES\n"
+            for title in title_texts:
+                print title,type(title)
+
+        links_arr = [link.a['href'] for link in links]
+
+        if DEBUG:
+            print "\nLINKS\n"
+            for link in links_arr:
+                print link,type(link)
+
+        i['yt_link'] = links_arr[0]
+
+    # return yt_links
 
 
 
@@ -106,14 +127,23 @@ def main():
         urllib.urlretrieve(obj["images"][0]["url"],"spotify_album_art.jpg")
 
     pl = get_playlist(album_url)
+    if DEBUG:
+        print_playlist(pl)
 
-    yt_links = get_youtube_links(pl)
+    get_youtube_links(pl)
+    if DEBUG:
+        print_playlist(pl)
+
 
     if DEBUG:
-        for i in yt_links:
-            print 'https://www.youtube.com'+i
+        print_playlist(pl)
 
+    sel.get_dl_list(pl,'www.youtube.com')
 
+    if DEBUG:
+        print_playlist(pl)
+
+    # download_songs(dl_list)
 
 if __name__ == "__main__":
     main()

@@ -2,3 +2,4 @@ cleanup.sh
 run.sh
 instantmusic.py
 *.pyc
+*.log

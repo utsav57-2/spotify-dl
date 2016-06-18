@@ -19,8 +19,8 @@ def get_dl_link(driver,yt_link):
 
     submit_button = driver.find_element_by_id('submit')
     submit_button.send_keys(Keys.ENTER)
-    # time.sleep(10)
 
+    # spend maximum of 10 seconds on a single link
     link_div = None
     no_of_tries = 0
     while not link_div and no_of_tries < 10:
@@ -32,11 +32,27 @@ def get_dl_link(driver,yt_link):
 
 
     if not link_div:
-        # handle exception
+        return None
 
     links = link_div.find_elements_by_tag_name('a')
     links = [i.get_attribute('href') for i in links]
     return max(links)
+
+
+def get_dl_list(pl,base_url=None):
+    driver = init_driver()
+    for sng in pl:
+        dl_link = get_dl_link(driver,base_url + sng['yt_link'])
+
+        # TODO
+        if not dl_link:
+            pass
+
+        sng['dl_link'] = dl_link
+
+    close_driver(driver)
+
+
 
 
 def close_driver(driver):
