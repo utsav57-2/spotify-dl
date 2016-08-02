@@ -117,6 +117,28 @@ def get_youtube_links(pl):
     # return yt_links
 
 
+def Download(d_link,file_name):
+    u = urllib2.urlopen(d_link)
+    f = open(file_name, 'wb')
+    meta = u.info()
+    file_size = int(meta.getheaders("Content-Length")[0])
+    print "Downloading: %s MBytes: %3.2f" % (file_name, file_size/(1024.0 ** 2))
+
+    file_size_dl = 0
+    block_sz = 8192
+    while True:
+        buffer = u.read(block_sz)
+        if not buffer:
+            break
+
+        file_size_dl += len(buffer)
+        f.write(buffer)
+        status = r"%10d  [%3.2f%%]" % (file_size_dl, file_size_dl * 100. / file_size)
+        status = status + chr(8)*(len(status)+1)
+        print status,
+
+    f.close()
+
 
 
 
@@ -144,6 +166,19 @@ def main():
         print_playlist(pl)
 
     # download_songs(dl_list)
+
+    path = 'playl'
+    if not os.path.isdir(path):
+        os.mkdir(path)
+        os.chdir(path)
+    else:
+        os.chdir(path)
+
+
+    for song in playlist:
+        file_name = song['artists'] + ' - ' + song['song_name']
+        Download(song['dl_link'],file_name)
+
 
 if __name__ == "__main__":
     main()
