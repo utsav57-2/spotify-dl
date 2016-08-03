@@ -5,6 +5,7 @@ import json
 import sys
 from urllib import quote_plus as qp
 import sel
+import os
 
 ALBUM_ART = False
 DEBUG = True
@@ -118,6 +119,8 @@ def get_youtube_links(pl):
 
 
 def Download(d_link,file_name):
+    if DEBUG:
+        print d_link
     u = urllib2.urlopen(d_link)
     f = open(file_name, 'wb')
     meta = u.info()
@@ -148,10 +151,13 @@ def main():
     if ALBUM_ART:
         urllib.urlretrieve(obj["images"][0]["url"],"spotify_album_art.jpg")
 
+    print "Getting playlist..."
     pl = get_playlist(album_url)
     if DEBUG:
         print_playlist(pl)
 
+
+    print "Fetching Youtube links..."
     get_youtube_links(pl)
     if DEBUG:
         print_playlist(pl)
@@ -160,6 +166,7 @@ def main():
     if DEBUG:
         print_playlist(pl)
 
+    print "Fetching download links..."
     sel.get_dl_list(pl,'www.youtube.com')
 
     if DEBUG:
@@ -167,6 +174,7 @@ def main():
 
     # download_songs(dl_list)
 
+    print "Creating folder..."
     path = 'playl'
     if not os.path.isdir(path):
         os.mkdir(path)
@@ -175,8 +183,9 @@ def main():
         os.chdir(path)
 
 
-    for song in playlist:
-        file_name = song['artists'] + ' - ' + song['song_name']
+    print "Downloading songs.."
+    for song in pl:
+        file_name = song['artists'][0] + ' - ' + song['song_name'] + ".mp3"
         Download(song['dl_link'],file_name)
 
 
