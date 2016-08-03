@@ -6,9 +6,11 @@ import sys
 from urllib import quote_plus as qp
 import sel
 import os
+import eyed3
 
 ALBUM_ART = False
 DEBUG = True
+playlist_name =""
 
 def get_playlist_json(album_url):
     result = urllib2.urlopen(album_url)
@@ -36,9 +38,10 @@ def get_playlist(album_url):
     #     line1 = "Description : " + "\n"
     # fp.write(line1.encode("utf-8"))
     # fp.write("Followers : "+str(obj["followers"]["total"]) +"\n" +"\n")
-
+    global playlist_name
     obj = get_playlist_json(album_url)
     lst = obj["tracks"]["items"]
+    playlist_name = obj["name"]
     playlist = []
     for song in lst:
         album=song["track"]["album"]["name"]
@@ -59,10 +62,10 @@ def get_playlist(album_url):
         #     duration = str(mins) + ":" + str(secs)
 
         name = song["track"]["name"]
-        # image_name = artists + " - " + album + ".jpg"
-        # urllib.urlretrieve(song["track"]["album"]["images"][0]["url"],image_name.encode("utf-8"))
+        album_art_url = song["track"]["album"]["images"][0]["url"]
+        song_id = song["track"]["id"]
         # out_str = artists + " - " + name + " - " + album + " - " + str(duration)
-        playlist.append( { "artists":artists,"song_name":name,"album":album } )
+        playlist.append( { "artists":artists,"song_name":name,"album":album,"album_art":album_art_url, "song_id":song_id.encode('utf-8') } )
 
     return playlist
 
@@ -117,8 +120,20 @@ def get_youtube_links(pl):
 
     # return yt_links
 
+    #adding id3 tags to downloaded file
+def id3_tags(file_name,song):
+    mp3_file = eyed3.load(file_name)
+    mp3_file.tag.artist = song['artists'][0]
+    mp3_file.tag.album = song['album']
+    mp3_file.tag.title = song['song_name']
+    urllib.urlretrieve(song['album_art'],"image.jpeg")
+    imagefile = open("image.jpeg","rb").read()
+    mp3_file.tag.images.set(3,imagefile,"image/jpeg")
+    mp3_file.tag.save()
+    os.remove("image.jpeg")
 
-def Download(d_link,file_name):
+    #
+def Download_from_playlist(d_link,file_name):
     if DEBUG:
         print d_link
     u = urllib2.urlopen(d_link)
@@ -140,8 +155,9 @@ def Download(d_link,file_name):
         status = status + chr(8)*(len(status)+1)
         print status,
 
-    f.close()
+    print
 
+    f.close()
 
 
 
@@ -156,6 +172,31 @@ def main():
     if DEBUG:
         print_playlist(pl)
 
+    print "Creating folder..."
+    path = playlist_name
+    if not os.path.isdir(path):
+        os.mkdir(path)
+    os.chdir(path)
+
+    try:
+        with open(".id_file","r") as fp:
+            id_dic = [i[:-1] for i in fp.readlines()]
+
+    except IOError:
+        id_dic =[]
+
+
+    if DEBUG:
+        print id_dic
+
+    # for song in pl:
+    #     if song["song_id"] not in id_dic:
+    #         pl_new.append
+
+    pl = [song for song in pl if song["song_id"] not in id_dic]
+
+    if DEBUG:
+        print pl
 
     print "Fetching Youtube links..."
     get_youtube_links(pl)
@@ -174,19 +215,22 @@ def main():
 
     # download_songs(dl_list)
 
-    print "Creating folder..."
-    path = 'playl'
-    if not os.path.isdir(path):
-        os.mkdir(path)
-        os.chdir(path)
-    else:
-        os.chdir(path)
+
+
 
 
     print "Downloading songs.."
+
     for song in pl:
         file_name = song['artists'][0] + ' - ' + song['song_name'] + ".mp3"
-        Download(song['dl_link'],file_name)
+        Download_from_playlist(song['dl_link'],file_name)
+        id3_tags(file_name,song)
+        id_dic.append(song["song_id"])
+        # else:
+            # print "Skipping %s ..already exist" % (file_name)
+    with open(".id_file","w") as fp:
+        fp.write("\n".join(id_dic) + "\n")
+
 
 
 if __name__ == "__main__":
