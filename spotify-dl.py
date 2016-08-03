@@ -10,6 +10,7 @@ import eyed3
 
 ALBUM_ART = False
 DEBUG = True
+playlist_name =""
 
 def get_playlist_json(album_url):
     result = urllib2.urlopen(album_url)
@@ -37,9 +38,10 @@ def get_playlist(album_url):
     #     line1 = "Description : " + "\n"
     # fp.write(line1.encode("utf-8"))
     # fp.write("Followers : "+str(obj["followers"]["total"]) +"\n" +"\n")
-
+    global playlist_name
     obj = get_playlist_json(album_url)
     lst = obj["tracks"]["items"]
+    playlist_name = obj["name"]
     playlist = []
     for song in lst:
         album=song["track"]["album"]["name"]
@@ -61,8 +63,9 @@ def get_playlist(album_url):
 
         name = song["track"]["name"]
         album_art_url = song["track"]["album"]["images"][0]["url"]
+        song_id = song["track"]["id"]
         # out_str = artists + " - " + name + " - " + album + " - " + str(duration)
-        playlist.append( { "artists":artists,"song_name":name,"album":album,"album_art":album_art_url } )
+        playlist.append( { "artists":artists,"song_name":name,"album":album,"album_art":album_art_url, "song_id":song_id.encode('utf-8') } )
 
     return playlist
 
@@ -158,7 +161,6 @@ def Download_from_playlist(d_link,file_name):
 
 
 
-
 def main():
     album_url = sys.argv[1]
 
@@ -170,6 +172,31 @@ def main():
     if DEBUG:
         print_playlist(pl)
 
+    print "Creating folder..."
+    path = playlist_name
+    if not os.path.isdir(path):
+        os.mkdir(path)
+    os.chdir(path)
+
+    try:
+        with open(".id_file","r") as fp:
+            id_dic = [i[:-1] for i in fp.readlines()]
+
+    except IOError:
+        id_dic =[]
+
+
+    if DEBUG:
+        print id_dic
+
+    # for song in pl:
+    #     if song["song_id"] not in id_dic:
+    #         pl_new.append
+
+    pl = [song for song in pl if song["song_id"] not in id_dic]
+
+    if DEBUG:
+        print pl
 
     print "Fetching Youtube links..."
     get_youtube_links(pl)
@@ -188,20 +215,22 @@ def main():
 
     # download_songs(dl_list)
 
-    print "Creating folder..."
-    path = 'playl'
-    if not os.path.isdir(path):
-        os.mkdir(path)
-        os.chdir(path)
-    else:
-        os.chdir(path)
+
+
 
 
     print "Downloading songs.."
+
     for song in pl:
         file_name = song['artists'][0] + ' - ' + song['song_name'] + ".mp3"
         Download_from_playlist(song['dl_link'],file_name)
         id3_tags(file_name,song)
+        id_dic.append(song["song_id"])
+        # else:
+            # print "Skipping %s ..already exist" % (file_name)
+    with open(".id_file","w") as fp:
+        fp.write("\n".join(id_dic) + "\n")
+
 
 
 if __name__ == "__main__":
