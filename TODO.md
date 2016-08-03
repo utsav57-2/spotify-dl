@@ -2,7 +2,8 @@
 
 - readme.md
 - replace selenium with dryscrape
-- download song from the download link
+- ~~download song from the download link~~
+- fix selenium firefox driver
 - complete id3 tags and album art for downloaded audio
 - update dict with duration
 - refactor code

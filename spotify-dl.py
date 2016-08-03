@@ -5,6 +5,7 @@ import json
 import sys
 from urllib import quote_plus as qp
 import sel
+import os
 
 ALBUM_ART = False
 DEBUG = True
@@ -117,6 +118,30 @@ def get_youtube_links(pl):
     # return yt_links
 
 
+def Download(d_link,file_name):
+    if DEBUG:
+        print d_link
+    u = urllib2.urlopen(d_link)
+    f = open(file_name, 'wb')
+    meta = u.info()
+    file_size = int(meta.getheaders("Content-Length")[0])
+    print "Downloading: %s MBytes: %3.2f" % (file_name, file_size/(1024.0 ** 2))
+
+    file_size_dl = 0
+    block_sz = 8192
+    while True:
+        buffer = u.read(block_sz)
+        if not buffer:
+            break
+
+        file_size_dl += len(buffer)
+        f.write(buffer)
+        status = r"%10d  [%3.2f%%]" % (file_size_dl, file_size_dl * 100. / file_size)
+        status = status + chr(8)*(len(status)+1)
+        print status,
+
+    f.close()
+
 
 
 
@@ -126,10 +151,13 @@ def main():
     if ALBUM_ART:
         urllib.urlretrieve(obj["images"][0]["url"],"spotify_album_art.jpg")
 
+    print "Getting playlist..."
     pl = get_playlist(album_url)
     if DEBUG:
         print_playlist(pl)
 
+
+    print "Fetching Youtube links..."
     get_youtube_links(pl)
     if DEBUG:
         print_playlist(pl)
@@ -138,12 +166,28 @@ def main():
     if DEBUG:
         print_playlist(pl)
 
+    print "Fetching download links..."
     sel.get_dl_list(pl,'www.youtube.com')
 
     if DEBUG:
         print_playlist(pl)
 
     # download_songs(dl_list)
+
+    print "Creating folder..."
+    path = 'playl'
+    if not os.path.isdir(path):
+        os.mkdir(path)
+        os.chdir(path)
+    else:
+        os.chdir(path)
+
+
+    print "Downloading songs.."
+    for song in pl:
+        file_name = song['artists'][0] + ' - ' + song['song_name'] + ".mp3"
+        Download(song['dl_link'],file_name)
+
 
 if __name__ == "__main__":
     main()
