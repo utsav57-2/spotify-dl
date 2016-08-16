@@ -9,8 +9,8 @@ import os
 import eyed3
 
 ALBUM_ART = False
-DEBUG = True
-playlist_name =""
+DEBUG = False
+# playlist_name =""
 
 def get_playlist_json(album_url):
     result = urllib2.urlopen(album_url)
@@ -30,59 +30,51 @@ def get_playlist_json(album_url):
 
 def get_playlist(album_url):
 
-    # METADATA
-    #
-    # if obj["description"]:
-    #     line1 = "Description : "+obj["description"] +"\n"
-    # else:
-    #     line1 = "Description : " + "\n"
-    # fp.write(line1.encode("utf-8"))
-    # fp.write("Followers : "+str(obj["followers"]["total"]) +"\n" +"\n")
-    global playlist_name
+    # get playlist json
     obj = get_playlist_json(album_url)
+
+    # PLAYLIST METADATA
+    if obj["description"]:
+        desc = "Description : "+obj["description"] +"\n"
+    else:
+        desc = "Description : " + "\n"
+    description = desc.encode("utf-8")
+    followers = str(obj["followers"]["total"]) +"\n" +"\n"
+
+
     lst = obj["tracks"]["items"]
     playlist_name = obj["name"]
+
+    # list of tracks with their info
     playlist = []
     for song in lst:
         album=song["track"]["album"]["name"]
         artists=[artist["name"] for artist in song["track"]["artists"]]
-        # for artist in song["track"]["artists"]:
-        #     artists.append(artist["name"])
 
         # Duration info
-        #
-        # duration = song["track"]["duration_ms"]
-        # duration = duration/(1000*1.0)
-        # duration = int(round(duration))
-        # mins = duration/60
-        # secs = duration - mins*60
-        # if secs < 10:
-        #     duration = str(mins) + ":0" + str(secs)
-        # else:
-        #     duration = str(mins) + ":" + str(secs)
+        duration = song["track"]["duration_ms"]
+        duration = duration/(1000*1.0)
+        duration = int(round(duration))
+        mins = duration/60
+        secs = duration - mins*60
+        if secs < 10:
+            duration = str(mins) + ":0" + str(secs)
+        else:
+            duration = str(mins) + ":" + str(secs)
 
         name = song["track"]["name"]
         album_art_url = song["track"]["album"]["images"][0]["url"]
         song_id = song["track"]["id"]
-        # out_str = artists + " - " + name + " - " + album + " - " + str(duration)
-        playlist.append( { "artists":artists,"song_name":name,"album":album,"album_art":album_art_url, "song_id":song_id.encode('utf-8') } )
+        if DEBUG:
+            print ",".join(artists) + " - " + name + " - " + album + " - " + str(duration)
+        playlist.append( { "full_identifier": ",".join(artists) + " - " + name, "artists":artists,"song_name":name,"album":album,"album_art":album_art_url, "song_id":song_id.encode('utf-8'), "duration":duration } )
 
-    return playlist
+    return {"tracks":playlist, "playlist_name":playlist_name, "description":description, "followers":followers, "no_of_tracks":len(playlist)}
 
-def print_playlist(pl):
-    print "\nPLAYLIST:\n"
-    for track in pl:
-        for j in track:
-            print j,": ",track[j]
-        print
-
-    print
-
-
-def get_youtube_links(pl):
+def get_youtube_links(playlist):
     base_url = "https://www.youtube.com/results?search_query="
 
-    for i in pl:
+    for i in playlist:
         query = '' + qp(i["song_name"])
 
         artist_arr = [qp(j) for j in i["artists"]]
@@ -120,7 +112,7 @@ def get_youtube_links(pl):
 
     # return yt_links
 
-    #adding id3 tags to downloaded file
+#adding id3 tags to downloaded file
 def id3_tags(file_name,song):
     mp3_file = eyed3.load(file_name)
     mp3_file.tag.artist = song['artists'][0]
@@ -168,18 +160,20 @@ def main():
         urllib.urlretrieve(obj["images"][0]["url"],"spotify_album_art.jpg")
 
     print "Getting playlist..."
-    pl = get_playlist(album_url)
+    playlist = get_playlist(album_url)
     if DEBUG:
-        print_playlist(pl)
+        print playlist
 
-    print "Creating folder..."
-    path = playlist_name
+    print "Fetched " + str(playlist["no_of_tracks"]) + " tracks from playlist " + playlist["playlist_name"]
+
+    path = playlist["playlist_name"]
     if not os.path.isdir(path):
+        print "Creating folder " + path
         os.mkdir(path)
     os.chdir(path)
 
     try:
-        with open(".id_file","r") as fp:
+        with open(".playlist_info","r") as fp:
             id_dic = [i[:-1] for i in fp.readlines()]
 
     except IOError:
@@ -189,29 +183,40 @@ def main():
     if DEBUG:
         print id_dic
 
-    # for song in pl:
+    # for song in playlist:
     #     if song["song_id"] not in id_dic:
     #         pl_new.append
 
-    pl = [song for song in pl if song["song_id"] not in id_dic]
+    reduced_playlist = []
+    for track in playlist["tracks"]:
+        if track["song_id"] in id_dic:
+            print "Skipping track " + track["full_identifier"] + " - Already exists"
+        else:
+            reduced_playlist.append(track)
+
+    # playlist = [song for song in playlist if song["song_id"] not in id_dic]
+    if playlist["no_of_tracks"] != len(reduced_playlist):
+        print "Skipped " + str(playlist["no_of_tracks"] - len(reduced_playlist)) + " tracks"
+        playlist["tracks"] = reduced_playlist
+        playlist["no_of_tracks"] = len(reduced_playlist)
 
     if DEBUG:
-        print pl
+        print playlist
+
+    if playlist["no_of_tracks"] == 0:
+        print "Done"
+        return
 
     print "Fetching Youtube links..."
-    get_youtube_links(pl)
+    get_youtube_links(playlist["tracks"])
     if DEBUG:
-        print_playlist(pl)
-
-
-    if DEBUG:
-        print_playlist(pl)
+        print playlist
 
     print "Fetching download links..."
-    sel.get_dl_list(pl,'www.youtube.com')
+    sel.get_dl_list(playlist["tracks"],'www.youtube.com')
 
     if DEBUG:
-        print_playlist(pl)
+        print playlist
 
     # download_songs(dl_list)
 
@@ -221,15 +226,17 @@ def main():
 
     print "Downloading songs.."
 
-    for song in pl:
+    for song in playlist["tracks"]:
         file_name = song['artists'][0] + ' - ' + song['song_name'] + ".mp3"
         Download_from_playlist(song['dl_link'],file_name)
         id3_tags(file_name,song)
         id_dic.append(song["song_id"])
         # else:
             # print "Skipping %s ..already exist" % (file_name)
-    with open(".id_file","w") as fp:
+    with open(".playlist_info","w") as fp:
         fp.write("\n".join(id_dic) + "\n")
+
+    print "Done"
 
 
 
