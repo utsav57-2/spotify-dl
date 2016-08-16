@@ -4,13 +4,12 @@ import urllib
 import json
 import sys
 from urllib import quote_plus as qp
-import sel
+import scraper
 import os
 import eyed3
 
 ALBUM_ART = False
-DEBUG = False
-# playlist_name =""
+DEBUG = True
 
 def get_playlist_json(album_url):
     result = urllib2.urlopen(album_url)
@@ -71,68 +70,27 @@ def get_playlist(album_url):
 
     return {"tracks":playlist, "playlist_name":playlist_name, "description":description, "followers":followers, "no_of_tracks":len(playlist)}
 
-def get_youtube_links(playlist):
-    base_url = "https://www.youtube.com/results?search_query="
-
-    for i in playlist:
-        query = '' + qp(i["song_name"])
-
-        artist_arr = [qp(j) for j in i["artists"]]
-        artists = artist_arr[0]
-        for j in artist_arr[1:]:
-            artists = artists + '+' + j
-
-        query += '+'+artists
-        req_url = base_url + query
-
-        if DEBUG:
-            print 'Search Query: ' + req_url
-
-        result = urllib2.urlopen(req_url)
-        html = result.read()
-        soup = BeautifulSoup(html,"lxml")
-
-        links = soup.find_all('h3',class_='yt-lockup-title')
-        # TODO scrape title
-        title_texts = [link.a.string for link in links]
-
-        if DEBUG:
-            print "\nLINK TITLES\n"
-            for title in title_texts:
-                print title,type(title)
-
-        links_arr = [link.a['href'] for link in links]
-
-        if DEBUG:
-            print "\nLINKS\n"
-            for link in links_arr:
-                print link,type(link)
-
-        i['yt_link'] = links_arr[0]
-
-    # return yt_links
-
 #adding id3 tags to downloaded file
 def id3_tags(file_name,song):
     mp3_file = eyed3.load(file_name)
     mp3_file.tag.artist = song['artists'][0]
     mp3_file.tag.album = song['album']
     mp3_file.tag.title = song['song_name']
-    urllib.urlretrieve(song['album_art'],"image.jpeg")
-    imagefile = open("image.jpeg","rb").read()
+    urllib.urlretrieve(song['album_art'],".image.jpeg")
+    imagefile = open(".image.jpeg","rb").read()
     mp3_file.tag.images.set(3,imagefile,"image/jpeg")
     mp3_file.tag.save()
-    os.remove("image.jpeg")
+    os.remove(".image.jpeg")
 
-    #
-def Download_from_playlist(d_link,file_name):
+# download song
+def download_song(file_name,d_link):
     if DEBUG:
         print d_link
     u = urllib2.urlopen(d_link)
     f = open(file_name, 'wb')
     meta = u.info()
     file_size = int(meta.getheaders("Content-Length")[0])
-    print "Downloading: %s MBytes: %3.2f" % (file_name, file_size/(1024.0 ** 2))
+    print "Downloading: %s (%3.2f Mb)" % (file_name, file_size/(1024.0 ** 2)),
 
     file_size_dl = 0
     block_sz = 8192
@@ -143,7 +101,7 @@ def Download_from_playlist(d_link,file_name):
 
         file_size_dl += len(buffer)
         f.write(buffer)
-        status = r"%10d  [%3.2f%%]" % (file_size_dl, file_size_dl * 100. / file_size)
+        status = r"[%3.2f%% done]" % (file_size_dl * 100. / file_size)
         status = status + chr(8)*(len(status)+1)
         print status,
 
@@ -183,10 +141,6 @@ def main():
     if DEBUG:
         print id_dic
 
-    # for song in playlist:
-    #     if song["song_id"] not in id_dic:
-    #         pl_new.append
-
     reduced_playlist = []
     for track in playlist["tracks"]:
         if track["song_id"] in id_dic:
@@ -194,7 +148,6 @@ def main():
         else:
             reduced_playlist.append(track)
 
-    # playlist = [song for song in playlist if song["song_id"] not in id_dic]
     if playlist["no_of_tracks"] != len(reduced_playlist):
         print "Skipped " + str(playlist["no_of_tracks"] - len(reduced_playlist)) + " tracks"
         playlist["tracks"] = reduced_playlist
@@ -207,32 +160,14 @@ def main():
         print "Done"
         return
 
-    print "Fetching Youtube links..."
-    get_youtube_links(playlist["tracks"])
-    if DEBUG:
-        print playlist
-
-    print "Fetching download links..."
-    sel.get_dl_list(playlist["tracks"],'www.youtube.com')
-
-    if DEBUG:
-        print playlist
-
-    # download_songs(dl_list)
-
-
-
-
-
-    print "Downloading songs.."
-
-    for song in playlist["tracks"]:
-        file_name = song['artists'][0] + ' - ' + song['song_name'] + ".mp3"
-        Download_from_playlist(song['dl_link'],file_name)
+    scrapr = scraper.Scraper()
+    for index,song in enumerate(playlist["tracks"]):
+        file_name = song["full_identifier"] + ".mp3"
+        print "Downloading song(%d/%d).." % (index+1,playlist["no_of_tracks"])
+        download_song(file_name,scrapr.get_download_link(song))
         id3_tags(file_name,song)
         id_dic.append(song["song_id"])
-        # else:
-            # print "Skipping %s ..already exist" % (file_name)
+
     with open(".playlist_info","w") as fp:
         fp.write("\n".join(id_dic) + "\n")
 
